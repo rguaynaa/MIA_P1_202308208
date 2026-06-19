@@ -3,11 +3,12 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
-	"mia/types"
 	"os"
 	"strings"
+	"types/types"
 	"unsafe"
 )
+
 func Tamanio(tamanio int64, unit string) int64 {
 	if strings.Compare(unit, "k") == 0 {
 		return int64(tamanio * 1024)
