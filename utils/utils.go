@@ -1,11 +1,11 @@
 package utils
 
 import (
+	"MIA_P1_202308208/types"
 	"bytes"
 	"encoding/binary"
 	"os"
 	"strings"
-	"types/types"
 	"unsafe"
 )
 

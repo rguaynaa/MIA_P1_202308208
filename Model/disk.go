@@ -5,12 +5,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand"
-	"mia/types"
-	"mia/utils"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"../types"
+	"../utils"
 )
 
 func CreateDisk(params map[string]string) {
@@ -78,7 +79,7 @@ func CreateDisk(params map[string]string) {
 			particionVacia,
 		},
 	}
-	copy(mbr.MbrFechaCreacion[:], utils.FechaActual())
+	copy(mbr.MbrFechaCreacion[:], time.Now().Format("2006-01-02"))
 
 	file, err := os.Create(path)
 	if err != nil {
