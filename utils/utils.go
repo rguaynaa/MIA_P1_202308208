@@ -170,6 +170,52 @@ func EscribirByte(archivo *os.File, offset int64, valor byte) {
 	archivo.Write([]byte{valor})
 }
 
+// TienePermiso verifica si un usuario (uid, gid, esRoot) puede realizar
+// la accion deseada ('r'=leer, 'w'=escribir, 'x'=ejecutar) sobre un inodo
+// dado su propietario (ownerUid, ownerGid) y sus permisos octales UGO (perm).
+func TienePermiso(perm string, ownerUid, ownerGid, uid, gid int32, isRoot bool, accion byte) bool {
+	if isRoot {
+		return true
+	}
+	if len(perm) != 3 {
+		return false
+	}
+
+	var grupo string
+	switch {
+	case uid == ownerUid:
+		grupo = string(perm[0]) // Usuario (propietario)
+	case gid == ownerGid:
+		grupo = string(perm[1]) // Grupo
+	default:
+		grupo = string(perm[2]) // Otros
+	}
+
+	val := digitoOctal(grupo)
+
+	switch accion {
+	case 'r':
+		return val == 4 || val == 5 || val == 6 || val == 7
+	case 'w':
+		return val == 2 || val == 3 || val == 6 || val == 7
+	case 'x':
+		return val == 1 || val == 3 || val == 5 || val == 7
+	}
+	return false
+}
+
+// digitoOctal convierte un caracter '0'-'7' a su valor numerico entero.
+func digitoOctal(s string) int {
+	if len(s) == 0 {
+		return 0
+	}
+	c := s[0]
+	if c >= '0' && c <= '7' {
+		return int(c - '0')
+	}
+	return 0
+}
+
 func SizeOf(v interface{}) int64 {
 	switch v.(type) {
 	case types.MBR:

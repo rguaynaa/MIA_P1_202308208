@@ -14,9 +14,9 @@ import (
 	"strings"
 )
 
-var IsScript bool = false
-
-// ParseLine parsea una linea de comando y extrae comando + parametros
+// ParseLine parsea una linea de comando y extrae comando + parametros.
+// Soporta -clave=valor, -clave = valor (con espacios sueltos alrededor del
+// signo =) y -clave valor (separado solo por espacio, sin signo =).
 func ParseLine(line string) (string, map[string]string) {
 	line = strings.TrimSpace(line)
 	if line == "" || strings.HasPrefix(line, "#") {
@@ -33,18 +33,58 @@ func ParseLine(line string) (string, map[string]string) {
 	i := 1
 	for i < len(tokens) {
 		token := tokens[i]
-		if strings.HasPrefix(token, "-") {
-			key := strings.ToLower(strings.TrimPrefix(token, "-"))
-			if i+1 < len(tokens) && !strings.HasPrefix(tokens[i+1], "-") {
-				params[key] = tokens[i+1]
-				i += 2
+		if !strings.HasPrefix(token, "-") {
+			i++
+			continue
+		}
+
+		rest := strings.TrimPrefix(token, "-")
+
+		// Caso "-clave=valor" pegado en un solo token
+		if idx := strings.Index(rest, "="); idx >= 0 {
+			key := strings.ToLower(strings.TrimSpace(rest[:idx]))
+			val := strings.TrimSpace(rest[idx+1:])
+			if val == "" {
+				// "-clave=" seguido de espacio: el valor viene en el siguiente token,
+				// que puede ser "=valor" o el valor solo (ya separado por tokenize).
+				i++
+				if i < len(tokens) {
+					next := tokens[i]
+					if strings.HasPrefix(next, "=") {
+						val = strings.TrimPrefix(next, "=")
+						i++
+					} else if !strings.HasPrefix(next, "-") {
+						val = next
+						i++
+					}
+				}
 			} else {
-				params[key] = "true"
 				i++
 			}
-		} else {
-			i++
+			params[key] = strings.ReplaceAll(val, "\"", "")
+			continue
 		}
+
+		// Caso "-clave" sin "=" en el mismo token: puede venir como
+		// "-clave" "=valor" (token siguiente empieza con =) o
+		// "-clave" "valor" o "-clave" solo (flag booleano).
+		key := strings.ToLower(rest)
+		if i+1 < len(tokens) {
+			next := tokens[i+1]
+			if strings.HasPrefix(next, "=") {
+				val := strings.TrimPrefix(next, "=")
+				params[key] = strings.ReplaceAll(val, "\"", "")
+				i += 2
+				continue
+			}
+			if !strings.HasPrefix(next, "-") {
+				params[key] = strings.ReplaceAll(next, "\"", "")
+				i += 2
+				continue
+			}
+		}
+		params[key] = "true"
+		i++
 	}
 	return cmd, params
 }
@@ -112,6 +152,8 @@ func Execute(cmd string, params map[string]string) {
 		execMkdir(params)
 	case "MKFILE":
 		execMkfile(params)
+	case "RM":
+		execRm(params)
 	case "REP":
 		report.Rep(params)
 	case "PAUSE":
@@ -164,13 +206,34 @@ func execMkfile(params map[string]string) {
 		fmt.Sscanf(s, "%d", &size)
 	}
 	cont := strings.ReplaceAll(params["cont"], "\"", "")
+	_, r := params["r"]
 
 	mp, ok3 := mount.GetMountedPartition(mount.CurrentSession.Id)
 	if !ok3 {
 		fmt.Println("Error: particion no montada")
 		return
 	}
-	filesystem.MkFile(mp, path, size, cont, mount.CurrentSession.Uid, mount.CurrentSession.Gid)
+	filesystem.MkFile(mp, path, size, cont, r, mount.CurrentSession.Uid, mount.CurrentSession.Gid)
+}
+
+func execRm(params map[string]string) {
+	if mount.CurrentSession == nil {
+		fmt.Println("Error: no hay sesion activa")
+		return
+	}
+	path, ok := params["path"]
+	if !ok {
+		fmt.Println("Error: RM requiere -path")
+		return
+	}
+	path = strings.ReplaceAll(path, "\"", "")
+
+	mp, ok2 := mount.GetMountedPartition(mount.CurrentSession.Id)
+	if !ok2 {
+		fmt.Println("Error: particion no montada")
+		return
+	}
+	filesystem.RmFile(mp, path, mount.CurrentSession.Uid, mount.CurrentSession.Gid, mount.CurrentSession.IsRoot)
 }
 
 func execScript(params map[string]string) {
@@ -185,8 +248,6 @@ func execScript(params map[string]string) {
 
 // RunScript ejecuta un archivo .smia
 func RunScript(path string) {
-	IsScript = true
-	defer func() { IsScript = false }()
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println("Error al abrir script:", err)

@@ -149,6 +149,11 @@ func RmGrp(params map[string]string) {
 	}
 	name = strings.ReplaceAll(name, "\"", "")
 
+	if name == "root" {
+		fmt.Println("Error: no se puede eliminar el grupo root")
+		return
+	}
+
 	mp, _ := mount.GetMountedPartition(mount.CurrentSession.Id)
 	content := filesystem.ReadUsersFile(mp)
 	lines := strings.Split(content, "\n")
@@ -253,6 +258,11 @@ func RmUsr(params map[string]string) {
 		return
 	}
 	user = strings.ReplaceAll(user, "\"", "")
+
+	if user == "root" {
+		fmt.Println("Error: no se puede eliminar al usuario root")
+		return
+	}
 
 	mp, _ := mount.GetMountedPartition(mount.CurrentSession.Id)
 	content := filesystem.ReadUsersFile(mp)

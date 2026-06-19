@@ -110,7 +110,7 @@ func Mkfs(params map[string]string) {
 	copy(inodo0.IAtime[:], utils.FechaActual())
 	copy(inodo0.ICtime[:], utils.FechaActual())
 	copy(inodo0.IMtime[:], utils.FechaActual())
-	copy(inodo0.IPerm[:], "664")
+	copy(inodo0.IPerm[:], "777")
 	for i := range inodo0.IBlock {
 		inodo0.IBlock[i] = -1
 	}

@@ -164,24 +164,28 @@ func repDisk(archivo *os.File, path string, mp *types.MountedPartition) {
 	grafo += "<TD BGCOLOR=\"#cccccc\"><B>MBR</B></TD>\n"
 
 	mbrSize := int64(unsafe.Sizeof(mbr))
-	usedSpace := mbrSize
 	type Seg struct {
 		nombre string
 		inicio int64
 		size   int64
 		tipo   string
+		extIdx int // indice de particion extendida en mbr, -1 si no aplica
 	}
 	var segs []Seg
 	for i := 0; i < 4; i++ {
 		p := mbr.MbrPartitions[i]
 		if p.PartStart > 0 && p.PartS > 0 {
+			extIdx := -1
+			if p.PartType == 'E' {
+				extIdx = i
+			}
 			segs = append(segs, Seg{
 				nombre: utils.BytesToString(p.PartName[:]),
 				inicio: p.PartStart,
 				size:   p.PartS,
 				tipo:   string(p.PartType),
+				extIdx: extIdx,
 			})
-			usedSpace += p.PartS
 		}
 	}
 	// Ordenar segs por inicio
@@ -200,12 +204,14 @@ func repDisk(archivo *os.File, path string, mp *types.MountedPartition) {
 			pct := float64(libre) * 100 / float64(mbr.MbrTamanio)
 			grafo += fmt.Sprintf("<TD BGCOLOR=\"#ffffff\">Libre<BR/>%.2f%%</TD>\n", pct)
 		}
-		pct := float64(s.size) * 100 / float64(mbr.MbrTamanio)
-		color := "#99ccff"
-		if s.tipo == "E" {
-			color = "#ffcc99"
+
+		if s.extIdx >= 0 {
+			// Particion extendida: desglosar logicas + EBRs + espacio libre interno
+			grafo += desglosarExtendida(archivo, s.inicio, s.size, mbr.MbrTamanio)
+		} else {
+			pct := float64(s.size) * 100 / float64(mbr.MbrTamanio)
+			grafo += fmt.Sprintf("<TD BGCOLOR=\"#99ccff\"><B>%s</B><BR/>%s<BR/>%.2f%%</TD>\n", s.nombre, s.tipo, pct)
 		}
-		grafo += fmt.Sprintf("<TD BGCOLOR=\"%s\"><B>%s</B><BR/>%s<BR/>%.2f%%</TD>\n", color, s.nombre, s.tipo, pct)
 		cursor = s.inicio + s.size
 	}
 	if cursor < mbr.MbrTamanio {
@@ -220,6 +226,52 @@ func repDisk(archivo *os.File, path string, mp *types.MountedPartition) {
 	f.WriteString(grafo)
 	f.Close()
 	generarPNG(txt, png)
+}
+
+// desglosarExtendida recorre la cadena de EBRs de una particion extendida y
+// genera celdas para cada EBR, cada particion logica, y el espacio libre
+// entre ellas, de forma que el desglose interno tambien suma 100% relativo
+// al disco completo.
+func desglosarExtendida(archivo *os.File, extInicio, extTamanio, discoTamanio int64) string {
+	ebrSize := int64(unsafe.Sizeof(types.EBR{}))
+	grafo := ""
+	cursor := extInicio
+	extFin := extInicio + extTamanio
+	offset := extInicio
+
+	for offset != -1 && offset < extFin {
+		ebr := utils.ObtenerEBR(archivo, offset)
+		if ebr.PartS == -1 {
+			break
+		}
+		if ebr.PartStart > cursor {
+			libre := ebr.PartStart - cursor - ebrSize
+			if libre > 0 {
+				pct := float64(libre) * 100 / float64(discoTamanio)
+				grafo += fmt.Sprintf("<TD BGCOLOR=\"#fff8e8\">Libre(L)<BR/>%.2f%%</TD>\n", pct)
+			}
+		}
+		// Celda del EBR
+		pctEbr := float64(ebrSize) * 100 / float64(discoTamanio)
+		grafo += fmt.Sprintf("<TD BGCOLOR=\"#ffe0c0\">EBR<BR/>%.2f%%</TD>\n", pctEbr)
+
+		// Celda de la particion logica
+		ename := utils.BytesToString(ebr.PartName[:])
+		pct := float64(ebr.PartS) * 100 / float64(discoTamanio)
+		grafo += fmt.Sprintf("<TD BGCOLOR=\"#ffcc99\"><B>%s</B><BR/>L<BR/>%.2f%%</TD>\n", ename, pct)
+
+		cursor = ebr.PartStart + ebr.PartS
+		offset = ebr.PartNext
+	}
+
+	// Espacio libre al final de la extendida
+	if cursor < extFin {
+		libre := extFin - cursor
+		pct := float64(libre) * 100 / float64(discoTamanio)
+		grafo += fmt.Sprintf("<TD BGCOLOR=\"#fff8e8\">Libre(L)<BR/>%.2f%%</TD>\n", pct)
+	}
+
+	return grafo
 }
 
 func getPartStartFromFile(archivo *os.File, mp *types.MountedPartition) int64 {
@@ -501,7 +553,9 @@ func repFile(path string, mp *types.MountedPartition, filePath string) {
 		fmt.Println("Error: REP file requiere -path_file_ls")
 		return
 	}
-	content := filesystem.GetFileContent(mp, filePath)
+	// Los reportes se generan con privilegios administrativos (no dependen
+	// de sesion de usuario), por eso se lee forzando isRoot=true.
+	content := filesystem.GetFileContent(mp, filePath, 1, 1, true)
 	txt, png := prepararRuta(path)
 
 	grafo := "digraph File {\n"

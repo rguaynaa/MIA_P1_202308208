@@ -28,7 +28,7 @@ func main() {
 
 	// REPL interactivo
 	fmt.Println("===========================================")
-	fmt.Println("  EXT2 ")
+	fmt.Println(" 	 			    EXT2	     		    ")
 	fmt.Println("===========================================")
 	fmt.Println("Comandos: MKDISK, RMDISK, FDISK, MOUNT, MKFS,")
 	fmt.Println("          LOGIN, LOGOUT, MKGRP, RMGRP, MKUSR,")

@@ -301,6 +301,8 @@ func DeletePartition(params map[string]string) {
 	defer archivo.Close()
 
 	mbr := utils.ObtenerMBR(archivo)
+
+	// Buscar primero en particiones primarias/extendidas del MBR
 	for i := 0; i < 4; i++ {
 		n := utils.BytesToString(mbr.MbrPartitions[i].PartName[:])
 		if n == name {
@@ -310,5 +312,65 @@ func DeletePartition(params map[string]string) {
 			return
 		}
 	}
+
+	// No esta en el MBR: buscar en la cadena de EBRs de la extendida
+	for i := 0; i < 4; i++ {
+		if mbr.MbrPartitions[i].PartType != 'E' {
+			continue
+		}
+		extStart := mbr.MbrPartitions[i].PartStart
+		if deleteLogica(archivo, extStart, name) {
+			fmt.Println("Particion logica eliminada:", name)
+			return
+		}
+	}
+
 	fmt.Println("Error: particion no encontrada")
+}
+
+// deleteLogica recorre la cadena de EBRs desde extStart buscando 'name'.
+// Si la encuentra, la desenlaza de la cadena (el EBR anterior salta al
+// PartNext de la eliminada) y la marca como libre.
+func deleteLogica(archivo *os.File, extStart int64, name string) bool {
+	currentOffset := extStart
+	var prevOffset int64 = -1
+
+	for {
+		ebr := utils.ObtenerEBR(archivo, currentOffset)
+		if ebr.PartS == -1 {
+			return false
+		}
+		ename := utils.BytesToString(ebr.PartName[:])
+		if ename == name {
+			if prevOffset == -1 {
+				// Es el primer EBR de la cadena: lo dejamos vacio pero
+				// conservamos el enlace al siguiente, copiando sus datos
+				// hacia esta posicion (la cadena no puede empezar "vacia"
+				// en medio si hay mas logicas detras).
+				next := ebr.PartNext
+				if next != -1 {
+					siguienteEbr := utils.ObtenerEBR(archivo, next)
+					utils.EscribirEBR(archivo, siguienteEbr, currentOffset)
+					// Liberar el bloque del EBR que se movio
+					vacio := types.EBR{PartS: -1, PartStart: -1, PartNext: -1}
+					utils.EscribirEBR(archivo, vacio, next)
+				} else {
+					vacio := types.EBR{PartS: -1, PartStart: -1, PartNext: -1}
+					utils.EscribirEBR(archivo, vacio, currentOffset)
+				}
+			} else {
+				prevEbr := utils.ObtenerEBR(archivo, prevOffset)
+				prevEbr.PartNext = ebr.PartNext
+				utils.EscribirEBR(archivo, prevEbr, prevOffset)
+				vacio := types.EBR{PartS: -1, PartStart: -1, PartNext: -1}
+				utils.EscribirEBR(archivo, vacio, currentOffset)
+			}
+			return true
+		}
+		if ebr.PartNext == -1 {
+			return false
+		}
+		prevOffset = currentOffset
+		currentOffset = ebr.PartNext
+	}
 }
