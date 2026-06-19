@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"../types"
-	"../utils"
+	"mia/types"
+	"mia/utils"
 )
 
 func CreateDisk(params map[string]string) {

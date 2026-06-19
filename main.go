@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"comandos"
+	"mia/commands"
 	"os"
 	"strings"
 )
