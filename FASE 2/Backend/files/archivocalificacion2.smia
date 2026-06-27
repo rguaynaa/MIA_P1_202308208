@@ -1,0 +1,212 @@
+#MOUNT
+mount -path=/home/usr/mia/cali/d3.dsk -name=Part1D3
+
+#MKFS A PARTICION
+mkfs -type-=full -id-=XX3A #MKFS a Part1D3 del disco con nombre d3.dsk
+
+#REPORTES INICIALES
+rep -id=XX3A -Path="/home/usr/parte2/reportes/iniciales/ext2_sb_1.jpg" -name=sb
+rep -Path="/home/usr/parte2/reportes/iniciales/ext2_tree_1.jpg" -name=tree -id=XX3A
+
+PAUSE
+
+#Eerror
+Loogin -pass=567 -usr=roca -id=XX3A
+
+#Error
+Login -pass=567 -usr=roca -id=XX3A
+#error
+logout
+PAUSE
+Login -pass=123 -usr=root -id=XX3A
+
+pause
+
+#CREACION DE GRUPOS
+mkgrp -naMe=Archivos
+mkgrp -naMe=elAuxEsBuenaOnda
+mkgRP -naMe=elAuxEsBuenaOnda
+mkgRP -naMe=Arquizzz
+mkgRP -naMe=yaNoSale
+mkgRP -naMe=eliminar
+mkgRP -naMe=eliminiado_s
+
+#Validar cambios en el archivo
+Cat -file=/users.txt
+pause
+
+#ELIMINACION DE GRUPOS
+rmgrp -name=eliminiado_s
+rmgrp -nam=eliminir
+
+#Validar cambios en el archivo
+Cat -file=/users.txt
+pause
+
+#CREACION DE USUARIOS
+Mkusr -user="user1" -grp=root -pass=user1
+Mkuser -user="user2" -pass=user2 -grp=elAuxEsBuenaOnda 
+Mkuser -grp=Arquizzz -user="user3" -pass=user3
+Mkuser -user="user4" -grp==yaNoSale -pass=user4
+Mkuser -user="eliminar" -grp==Archivos -pass=del
+
+#Validar cambios en el archivo
+Cat -file=/users.txt
+pause
+
+#ELIMINACION DE USUARIOS
+rmusr -usr="eliminar"
+rmusr -usr="user3"
+rmusrr -usr="user1"
+
+#Validar cambios en el archivo
+Cat -file=/users.txt
+pause
+
+#CAMBIAR USUARIO DE GRUPO
+chgrp -usr="user3" -grp=elAuxEsBuenaOnda
+chgrp -usr="user4" -grupo=elAuxEsBuenaOnda
+
+#Validar cambios en el archivo
+Cat -file=/users.txt
+pause
+
+#CREACION DE CARPETAS
+Mkdir -P -path=/home/archivos/mia/fase2
+Mkdir -P -path=/home/archivos/mia/carpeta2
+Mkdir -P -path=/home/archivos/mia/z
+Mkdir -P -path=/home/archivos/mia/carpeta3/carpeta7/carpeta8/carpeta9/carpeta10/carpeta11
+Mkdir -P -path=/home/archivos/mia/carpeta4/carpeta7/carpeta8/carpeta9/carpeta10/carpeta11/carpeta7/carpeta8/carpeta9/carpeta10/carpeta11
+Mkdir -path=/home/archivos/mia/carpeta2/a1
+Mkdir -path=/home/archivos/mia/carpeta2/a2
+Mkdir -path=/home/archivos/mia/carpeta2/a3
+Mkdir -path=/home/archivos/mia/carpeta2/a4
+Mkdir -path=/home/archivos/mia/carpeta2/a5
+Mkdir -path=/home/archivos/mia/carpeta2/a6
+Mkdir -path=/home/archivos/mia/carpeta2/a7
+Mkdir -path=/home/archivos/mia/carpeta2/a8
+Mkdir -path=/home/archivos/mia/carpeta2/a9
+Mkdir -path=/home/archivos/mia/carpeta2/a10
+Mkdir -path=/home/archivos/mia/carpeta2/a10
+
+rep -id=XX3A -Path="/home/usr/parte2/reportes/avanzado/sb.jpg" -name=sb
+rep -id=XX3A -Path="/home/usr/parte2/reportes/avanzado/tree.jpg" -name=tree
+rep -id=XX3A -Path="/home/usr/parte2/reportes/avanzado/inode.pdf" -name=inode
+rep -id=XX3A -Path="/home/usr/parte2/reportes/avanzado/block.pdf" -name=block
+rep -id=XX3A -Path="/home/usr/parte2/reportes/avanzado/bm_inode2.pdf" -name=bm_inode
+rep -id=XX3A -Path="/home/usr/parte2/reportes/avanzado/bm_block2.pdf" -name=bm_block
+
+#CREACION DE ARCHIVOS
+mkfile -path="/home/b1.txt" -size=75
+#Debe dar error ruta no existe
+mkfile -path="/home/Noexiste/b2.txt" -size=75
+mkfile -r -path="/home/AhoraSiExiste/b2.txt" -size=175
+mkfile -path="/home/archivos/mia/carpeta2/a10/b3.txt" -size=200
+mkfile -path="/home/archivos/mia/carpeta2/a10/b4.txt" -size=-10
+
+PAUSE
+
+#CAMBIAR PARAMETRO -cont POR UN ARCHIVO QUE SI EXISTA EN SU COMPUTADORA
+mkfile -path="/home/b1.txt" -cont=/home/usr/documents/algo.txt
+
+rep -id=XX3A -path="/home/usr/parte2/reportes/avanzado/mkfile/tree.jpg" -name=tree
+rep -id=XX3A -path="/home/usr/parte2/reportes/avanzado/mkfile/inode.pdf" -name=inode
+rep -id=XX3A -path="/home/usr/parte2/reportes/avanzado/mkfile/block.pdf" -name=block
+rep -id=XX3A -path="/home/usr/parte2/reportes/avanzado/mkfile/bm_inode.pdf" -name=bm_inode
+rep -id=XX3A -path="/home/usr/parte2/reportes/avanzado/mkfile/bm_block.pdf" -name=bm_block
+
+PAUSE
+
+Mkdir -path=/home/archivos/mia/fase2/a11
+Mkdir -path=/home/archivos/mia/fase2/a12
+Mkdir -path=/home/archivos/mia/fase2/a13
+Mkdir -path=/home/archivos/mia/fase2/a14
+Mkdir -path=/home/archivos/mia/fase2/a15
+Mkdir -path=/home/archivos/mia/fase2/a16
+Mkdir -path=/home/archivos/mia/fase2/a17
+Mkdir -path=/home/archivos/mia/fase2/a18
+Mkdir -path=/home/archivos/mia/fase2/a19
+Mkdir -path=/home/archivos/mia/fase2/a20
+Mkdir -path=/home/archivos/mia/fase2/a21
+Mkdir -path=/home/archivos/mia/fase2/a22
+Mkdir -path=/home/archivos/mia/fase2/a23
+Mkdir -path=/home/archivos/mia/fase2/a24
+Mkdir -path=/home/archivos/mia/fase2/a25
+Mkdir -path=/home/archivos/mia/fase2/a26
+Mkdir -path=/home/archivos/mia/fase2/a27
+Mkdir -path=/home/archivos/mia/fase2/a28
+Mkdir -path=/home/archivos/mia/fase2/a29
+Mkdir -path=/home/archivos/mia/fase2/a30
+Mkdir -path=/home/archivos/mia/fase2/a31
+Mkdir -path=/home/archivos/mia/fase2/a32
+Mkdir -path=/home/archivos/mia/fase2/a33
+Mkdir -path=/home/archivos/mia/fase2/a34
+Mkdir -path=/home/archivos/mia/fase2/a35
+Mkdir -path=/home/archivos/mia/fase2/a36
+Mkdir -path=/home/archivos/mia/fase2/a37
+Mkdir -path=/home/archivos/mia/fase2/a38
+Mkdir -path=/home/archivos/mia/fase2/a39
+Mkdir -path=/home/archivos/mia/fase2/a40
+Mkdir -path=/home/archivos/mia/fase2/a41
+Mkdir -path=/home/archivos/mia/fase2/a42
+Mkdir -path=/home/archivos/mia/fase2/a43
+Mkdir -path=/home/archivos/mia/fase2/a44
+Mkdir -path=/home/archivos/mia/fase2/a45
+Mkdir -path=/home/archivos/mia/fase2/a46
+
+#Primer indirecto
+#mkdir -path="/home/archivos/mia/fase2/b1"
+#mkdir -path="/home/archivos/mia/fase2/b2"
+#mkdir -path="/home/archivos/mia/fase2/b3"
+#mkdir -path="/home/archivos/mia/fase2/b4"
+#mkdir -path="/home/archivos/mia/fase2/b5"
+#mkdir -path="/home/archivos/mia/fase2/b6"
+#mkdir -path="/home/archivos/mia/fase2/b7"
+#mkdir -path="/home/archivos/mia/fase2/b8"
+#mkdir -path="/home/archivos/mia/fase2/b9"
+#mkdir -path="/home/archivos/mia/fase2/b10"
+#mkdir -path="/home/archivos/mia/fase2/b11"
+#mkdir -path="/home/archivos/mia/fase2/b12"
+#mkdir -path="/home/archivos/mia/fase2/b13"
+#mkdir -path="/home/archivos/mia/fase2/b14"
+#mkdir -path="/home/archivos/mia/fase2/b15"
+#mkdir -path="/home/archivos/mia/fase2/b16"
+#mkdir -path="/home/archivos/mia/fase2/b17"
+#mkdir -path="/home/archivos/mia/fase2/b18"
+#mkdir -path="/home/archivos/mia/fase2/b19"
+#mkdir -path="/home/archivos/mia/fase2/b20"
+#mkdir -path="/home/archivos/mia/fase2/b21"
+#mkdir -path="/home/archivos/mia/fase2/b22"
+#mkdir -path="/home/archivos/mia/fase2/b23"
+#mkdir -path="/home/archivos/mia/fase2/b24"
+#mkdir -path="/home/archivos/mia/fase2/b25"
+#mkdir -path="/home/archivos/mia/fase2/b26"
+#mkdir -path="/home/archivos/mia/fase2/b27"
+#mkdir -path="/home/archivos/mia/fase2/b28"
+#mkdir -path="/home/archivos/mia/fase2/b29"
+#mkdir -path="/home/archivos/mia/fase2/b30"
+#mkdir -path="/home/archivos/mia/fase2/b31"
+#mkdir -path="/home/archivos/mia/fase2/b32"
+#mkdir -path="/home/archivos/mia/fase2/b33"
+#mkdir -path="/home/archivos/mia/fase2/b34"
+#mkdir -path="/home/archivos/mia/fase2/b35"
+#mkdir -path="/home/archivos/mia/fase2/b36"
+#mkdir -path="/home/archivos/mia/fase2/b37"
+#mkdir -path="/home/archivos/mia/fase2/b38"
+#mkdir -path="/home/archivos/mia/fase2/b39"
+#mkdir -path="/home/archivos/mia/fase2/b40"
+#mkdir -path="/home/archivos/mia/fase2/b41"
+#mkdir -path="/home/archivos/mia/fase2/b42"
+#mkdir -path="/home/archivos/mia/fase2/b43"
+#mkdir -path="/home/archivos/mia/fase2/b44"
+#mkdir -path="/home/archivos/mia/fase2/b45"
+#mkdir -path="/home/archivos/mia/fase2/b46"
+#mkdir -path="/home/archivos/mia/fase2/b47"
+#mkdir -path="/home/archivos/mia/fase2/b48"
+#mkdir -path="/home/archivos/mia/fase2/b49"
+#mkdir -path="/home/archivos/mia/fase2/b50"
+
+rep -id=XX3A -path="/home/usr/parte2/reportes/avanzado/INDIRECTO/tree.jpg" -name=tree
+rep -id=XX3A -path="/home/usr/parte2/reportes/avanzado/INDIRECTO/sb.jpg" -name=sb
+
+PAUSE
