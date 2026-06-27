@@ -619,8 +619,23 @@ func repTree(archivo *os.File, path string, mp *types.MountedPartition) {
 	grafo += "node [shape=plaintext fontsize=9];\n"
 	grafo += "rankdir=LR;\n"
 
+	//hace la misma verificacion pero sobre el bitmap de bloques
+	bloqueOcupado := func(blkNum int32) bool {
+		if blkNum < 0 || blkNum >= sb.SBlocksCount {
+			return false
+		}
+		bm := make([]byte, 1)
+		archivo.Seek(sb.SBmBlockStart+int64(blkNum), 0)
+		archivo.Read(bm)
+		return bm[0] == '1'
+	}
+
+
 	var buildTree func(inodoNum int32, depth int)
 	buildTree = func(inodoNum int32, depth int) {
+		if !inodoOcupado(inodoNum) { //evita inodos no usados o vacios
+			return
+		}
 		inodo := utils.ObtenerInodo(archivo, sb.SInodeStart+int64(inodoNum)*inodoSize)
 		tipo := "C"
 		color := "#e0ffe0"
@@ -639,6 +654,9 @@ func repTree(archivo *os.File, path string, mp *types.MountedPartition) {
 		for j, blkNum := range inodo.IBlock {
 			if blkNum == -1 {
 				break
+			}
+			if !bloqueOcupado(blkNum) { //se omiten bloques no usados o vacios, para evitar errores de lectura
+				continue
 			}
 			if j < 12 {
 				if inodo.IType == '0' {
@@ -659,6 +677,9 @@ func repTree(archivo *os.File, path string, mp *types.MountedPartition) {
 						n := utils.BytesToString(fb.BContent[k].BName[:])
 						child := fb.BContent[k].BInodo
 						if n == "." || n == ".." || n == "" || child == -1 {
+							continue
+						}
+						if !inodoOcupado(child) {
 							continue
 						}
 						buildTree(child, depth+1)

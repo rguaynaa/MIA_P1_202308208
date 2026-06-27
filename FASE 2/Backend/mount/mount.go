@@ -9,7 +9,7 @@ import (
 )
 
 // Carnet - ultimos 2 digitos
-const Carnet = "41"
+const Carnet = "08"
 
 var MountedPartitions []types.MountedPartition
 var CurrentSession *types.Session
@@ -86,7 +86,14 @@ func ListMounts() {
 		fmt.Println("No hay particiones montadas")
 		return
 	}
+	fmt.Println("Particiones montadas:")
 	for _, mp := range MountedPartitions {
-		fmt.Printf("ID: %s | Path: %s | Name: %s\n", mp.Id, mp.Path, mp.Name)
+		fmt.Printf("ID: %-6s | Disco: %-30s | Particion: %s-16 | Correlativo: %d \n",
+		 mp.Id, mp.Path, mp.Name, mp.Correlative)
 	}
+
+//devuelve la lista de particiones montadas
+func ListMountsStruct() []types.MountedPartition {
+	return MountedPartitions
+
 }
