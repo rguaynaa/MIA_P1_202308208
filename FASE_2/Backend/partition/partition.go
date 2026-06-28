@@ -10,6 +10,15 @@ import (
 )
 
 func CreatePartition(params map[string]string) {
+	if _, ok := params["delete"]; ok {
+		DeletePartition(params)
+		return
+	}
+	if _, ok := params["add"]; ok {
+		AddPartitionSpace(params)
+		return
+	}
+
 	sizeStr, ok1 := params["size"]
 	path, ok2 := params["path"]
 	name, ok3 := params["name"]
@@ -293,6 +302,12 @@ func DeletePartition(params map[string]string) {
 	path = strings.ReplaceAll(path, "\"", "")
 	name = strings.ReplaceAll(name, "\"", "")
 
+	modo := strings.ToLower(strings.ReplaceAll(params["delete"], "\"", ""))
+	if modo != "fast" && modo != "full" {
+		fmt.Println("Error: -delete debe ser 'fast' o 'full'")
+		return
+	}
+
 	archivo, err := os.OpenFile(path, os.O_RDWR, 0644)
 	if err != nil {
 		fmt.Println("Error al abrir el disco:", err)
@@ -305,13 +320,28 @@ func DeletePartition(params map[string]string) {
 	// Buscar primero en particiones primarias/extendidas del MBR
 	for i := 0; i < 4; i++ {
 		n := utils.BytesToString(mbr.MbrPartitions[i].PartName[:])
-		if n == name {
-			mbr.MbrPartitions[i] = types.Partition{PartS: -1, PartStart: -1}
-			utils.EscribirMBR(archivo, mbr)
-			fmt.Println("Particion eliminada:", name)
-			return
+		if n != name {
+			continue
 		}
+		partStart := mbr.MbrPartitions[i].PartStart
+		partSize := mbr.MbrPartitions[i].PartS
+		esExtendida := mbr.MbrPartitions[i].PartType == 'E'
+
+		// Si es extendida, eliminar primero todas las logicas que contenga
+		if esExtendida {
+			eliminarTodasLasLogicas(archivo, partStart, modo)
+		}
+
+		if modo == "full" {
+			rellenarConCeros(archivo, partStart, partSize)
+		}
+
+		mbr.MbrPartitions[i] = types.Partition{PartS: -1, PartStart: -1}
+		utils.EscribirMBR(archivo, mbr)
+		fmt.Println("Particion eliminada:", name)
+		return
 	}
+
 
 	// No esta en el MBR: buscar en la cadena de EBRs de la extendida
 	for i := 0; i < 4; i++ {
@@ -326,6 +356,151 @@ func DeletePartition(params map[string]string) {
 	}
 
 	fmt.Println("Error: particion no encontrada")
+}
+
+// rellenarConCeros escribe el caracter \0 en todo el espacio fisico de la
+// particion, segun lo exige -delete=full.
+func rellenarConCeros(archivo *os.File, inicio, tamanio int64) {
+	if tamanio <= 0 {
+		return
+	}
+	const bufSize = 4096
+	buffer := make([]byte, bufSize)
+	archivo.Seek(inicio, 0)
+	restante := tamanio
+	for restante > 0 {
+		n := int64(bufSize)
+		if restante < n {
+			n = restante
+		}
+		archivo.Write(buffer[:n])
+		restante -= n
+	}
+}
+
+// eliminarTodasLasLogicas recorre la cadena de EBR de una extendida y
+// limpia (fast o full) cada particion logica encontrada, antes de que la
+// extendida misma sea eliminada.
+func eliminarTodasLasLogicas(archivo *os.File, extStart int64, modo string) {
+	currentOffset := extStart
+	for {
+		ebr := utils.ObtenerEBR(archivo, currentOffset)
+		if ebr.PartS == -1 {
+			break
+		}
+		if modo == "full" {
+			rellenarConCeros(archivo, ebr.PartStart, ebr.PartS)
+		}
+		next := ebr.PartNext
+		if next == -1 {
+			break
+		}
+		currentOffset = next
+	}
+}
+
+// AddPartitionSpace implementa fdisk -add: agrega o quita espacio a una
+// particion existente. Valor positivo agrega (verificando que el espacio
+// libre inmediatamente despues de la particion alcance), valor negativo
+// quita (verificando que la particion no quede en 0 o negativo).
+func AddPartitionSpace(params map[string]string) {
+	addStr, ok0 := params["add"]
+	path, ok1 := params["path"]
+	name, ok2 := params["name"]
+	if !ok0 || !ok1 || !ok2 {
+		fmt.Println("Error: FDISK -add requiere -add, -path y -name")
+		return
+	}
+	path = strings.ReplaceAll(path, "\"", "")
+	name = strings.ReplaceAll(name, "\"", "")
+
+	var addVal int64
+	fmt.Sscanf(addStr, "%d", &addVal)
+	if addVal == 0 {
+		fmt.Println("Error: -add no puede ser 0")
+		return
+	}
+
+	unit := "k"
+	if u, ok := params["unit"]; ok {
+		unit = strings.ToLower(u)
+	}
+	addBytes := utils.Tamanio(absInt64(addVal), unit)
+	if addBytes <= 0 {
+		fmt.Println("Error: unidad invalida")
+		return
+	}
+	if addVal < 0 {
+		addBytes = -addBytes
+	}
+
+	archivo, err := os.OpenFile(path, os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println("Error al abrir el disco:", err)
+		return
+	}
+	defer archivo.Close()
+
+	mbr := utils.ObtenerMBR(archivo)
+	mbrSize := int64(unsafe.Sizeof(mbr))
+
+	for i := 0; i < 4; i++ {
+		n := utils.BytesToString(mbr.MbrPartitions[i].PartName[:])
+		if n != name {
+			continue
+		}
+		p := &mbr.MbrPartitions[i]
+		nuevoTamanio := p.PartS + addBytes
+		if nuevoTamanio <= 0 {
+			fmt.Println("Error: no se puede dejar la particion con tamanio negativo o cero")
+			return
+		}
+
+		if addBytes > 0 {
+			// Verificar espacio libre disponible inmediatamente despues
+			finActual := p.PartStart + p.PartS
+			limite := siguienteInicioOFinDisco(mbr, mbrSize, i, finActual)
+			if finActual+addBytes > limite {
+				fmt.Println("Error: no hay espacio libre suficiente despues de la particion para agregar")
+				return
+			}
+		} else {
+			// addBytes negativo: solo se reduce el tamanio logico
+			// (el espacio liberado queda disponible para nuevas particiones).
+		}
+
+		p.PartS = nuevoTamanio
+		utils.EscribirMBR(archivo, mbr)
+		fmt.Printf("Particion %s actualizada, nuevo tamanio=%d bytes\n", name, nuevoTamanio)
+		return
+	}
+
+	fmt.Println("Error: particion no encontrada (las logicas no soportan -add)")
+}
+
+// siguienteInicioOFinDisco calcula el limite superior disponible para que
+// una particion (indice idx) pueda extenderse: el inicio de la particion
+// mas cercana que empiece despues de 'desde', o el final del disco si no
+// hay ninguna.
+func siguienteInicioOFinDisco(mbr types.MBR, mbrSize int64, idx int, desde int64) int64 {
+	limite := mbr.MbrTamanio
+	for j := 0; j < 4; j++ {
+		if j == idx {
+			continue
+		}
+		p := mbr.MbrPartitions[j]
+		if p.PartStart >= desde && p.PartStart < limite {
+			limite = p.PartStart
+		}
+	}
+	return limite
+}
+
+func absInt64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // deleteLogica recorre la cadena de EBRs desde extStart buscando 'name'.

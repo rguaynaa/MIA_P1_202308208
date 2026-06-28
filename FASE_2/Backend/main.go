@@ -4,12 +4,28 @@ import (
 	"bufio"
 	"fmt"
 	"mia/commands"
+	"mia/server"
 	"os"
 	"strings"
 )
 
 func main() {
 	args := os.Args[1:]
+
+	if len(args) > 0 && args[0] == "-server" {
+		addr := ":8080"
+		if len(args) > 1 {
+			addr = args[1]
+			if !strings.HasPrefix(addr, ":") {
+				addr = ":" + addr
+			}
+		}
+		if err := server.Start(addr); err != nil {
+			fmt.Println("Error al iniciar el servidor:", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Si se pasa un script como argumento
 	if len(args) > 0 {
