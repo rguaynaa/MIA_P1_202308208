@@ -123,13 +123,11 @@ func Execute(cmd string, params map[string]string) {
 	case "RMDISK":
 		disk.DeleteDisk(params)
 	case "FDISK":
-		if _, ok := params["delete"]; ok {
-			partition.DeletePartition(params)
-		} else {
-			partition.CreatePartition(params)
-		}
+		partition.CreatePartition(params)
 	case "MOUNT":
 		mount.Mount(params)
+	case "UNMOUNT":
+		mount.Unmount(params)
 	case "MOUNTED":
 		mount.ListMounts()
 	case "MKFS":
@@ -154,6 +152,18 @@ func Execute(cmd string, params map[string]string) {
 		execMkfile(params)
 	case "RM":
 		execRm(params)
+	case "REMOVE":
+		execRemove(params)
+	case "EDIT":
+		execEdit(params)
+	case "RENAME":
+		execRename(params)
+	case "COPY":
+		execCopy(params)
+	case "MOVE":
+		execMove(params)
+	case "CAT":
+		execCat(params)
 	case "REP":
 		report.Rep(params)
 	case "PAUSE":
@@ -162,7 +172,6 @@ func Execute(cmd string, params map[string]string) {
 	case "EXEC":
 		execScript(params)
 	case "":
-		// comentario o linea vacia
 	default:
 		fmt.Println("Comando desconocido:", cmd)
 	}
@@ -234,6 +243,139 @@ func execRm(params map[string]string) {
 		return
 	}
 	filesystem.RmFile(mp, path, mount.CurrentSession.Uid, mount.CurrentSession.Gid, mount.CurrentSession.IsRoot)
+}
+func execRemove(params map[string]string) {
+	if mount.CurrentSession == nil {
+		fmt.Println("Error: no hay sesion activa")
+		return
+	}
+	path, ok := params["path"]
+	if !ok {
+		fmt.Println("Error: REMOVE requiere -path")
+		return
+	}
+	path = strings.ReplaceAll(path, "\"", "")
+
+	mp, ok2 := mount.GetMountedPartition(mount.CurrentSession.Id)
+	if !ok2 {
+		fmt.Println("Error: particion no montada")
+		return
+	}
+	filesystem.RemoveRecursive(mp, path, mount.CurrentSession.Uid, mount.CurrentSession.Gid, mount.CurrentSession.IsRoot)
+}
+
+func execEdit(params map[string]string) {
+	if mount.CurrentSession == nil {
+		fmt.Println("Error: no hay sesion activa")
+		return
+	}
+	path, ok1 := params["path"]
+	contenido, ok2 := params["contenido"]
+	if !ok1 || !ok2 {
+		fmt.Println("Error: EDIT requiere -path y -contenido")
+		return
+	}
+	path = strings.ReplaceAll(path, "\"", "")
+	contenido = strings.ReplaceAll(contenido, "\"", "")
+
+	mp, ok3 := mount.GetMountedPartition(mount.CurrentSession.Id)
+	if !ok3 {
+		fmt.Println("Error: particion no montada")
+		return
+	}
+	filesystem.EditFile(mp, path, contenido, mount.CurrentSession.Uid, mount.CurrentSession.Gid, mount.CurrentSession.IsRoot)
+}
+
+func execRename(params map[string]string) {
+	if mount.CurrentSession == nil {
+		fmt.Println("Error: no hay sesion activa")
+		return
+	}
+	path, ok1 := params["path"]
+	name, ok2 := params["name"]
+	if !ok1 || !ok2 {
+		fmt.Println("Error: RENAME requiere -path y -name")
+		return
+	}
+	path = strings.ReplaceAll(path, "\"", "")
+	name = strings.ReplaceAll(name, "\"", "")
+
+	mp, ok3 := mount.GetMountedPartition(mount.CurrentSession.Id)
+	if !ok3 {
+		fmt.Println("Error: particion no montada")
+		return
+	}
+	filesystem.RenameFile(mp, path, name, mount.CurrentSession.Uid, mount.CurrentSession.Gid, mount.CurrentSession.IsRoot)
+}
+
+func execCopy(params map[string]string) {
+	if mount.CurrentSession == nil {
+		fmt.Println("Error: no hay sesion activa")
+		return
+	}
+	path, ok1 := params["path"]
+	destino, ok2 := params["destino"]
+	if !ok1 || !ok2 {
+		fmt.Println("Error: COPY requiere -path y -destino")
+		return
+	}
+	path = strings.ReplaceAll(path, "\"", "")
+	destino = strings.ReplaceAll(destino, "\"", "")
+
+	mp, ok3 := mount.GetMountedPartition(mount.CurrentSession.Id)
+	if !ok3 {
+		fmt.Println("Error: particion no montada")
+		return
+	}
+	filesystem.CopyFile(mp, path, destino, mount.CurrentSession.Uid, mount.CurrentSession.Gid, mount.CurrentSession.IsRoot)
+}
+
+func execMove(params map[string]string) {
+	if mount.CurrentSession == nil {
+		fmt.Println("Error: no hay sesion activa")
+		return
+	}
+	path, ok1 := params["path"]
+	destino, ok2 := params["destino"]
+	if !ok1 || !ok2 {
+		fmt.Println("Error: MOVE requiere -path y -destino")
+		return
+	}
+	path = strings.ReplaceAll(path, "\"", "")
+	destino = strings.ReplaceAll(destino, "\"", "")
+
+	mp, ok3 := mount.GetMountedPartition(mount.CurrentSession.Id)
+	if !ok3 {
+		fmt.Println("Error: particion no montada")
+		return
+	}
+	filesystem.MoveFile(mp, path, destino, mount.CurrentSession.Uid, mount.CurrentSession.Gid, mount.CurrentSession.IsRoot)
+}
+
+func execCat(params map[string]string) {
+	if mount.CurrentSession == nil {
+		fmt.Println("Error: no hay sesion activa")
+		return
+	}
+	mp, ok := mount.GetMountedPartition(mount.CurrentSession.Id)
+	if !ok {
+		fmt.Println("Error: particion no montada")
+		return
+	}
+
+	found := false
+	for k, v := range params {
+		if strings.HasPrefix(k, "file") {
+			found = true
+			content := filesystem.GetFileContent(mp, strings.ReplaceAll(v, "\"", ""), mount.CurrentSession.Uid, mount.CurrentSession.Gid, mount.CurrentSession.IsRoot)
+			if content != "" {
+				fmt.Print(content)
+			}
+		}
+	}
+	if !found {
+		fmt.Println("Error: CAT requiere parametros -file o -fileN")
+	}
 }
 
 func execScript(params map[string]string) {
