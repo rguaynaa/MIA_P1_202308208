@@ -41,6 +41,10 @@ export default function DiskPanel({ onActivity }) {
   const [mountName, setMountName] = useState('')
   const [mountMsg, setMountMsg] = useState(null)
 
+  // --- MKFS ---
+  const [fsId, setFsId] = useState('')
+  const [fsType, setFsType] = useState('full')
+  const [fsMsg, setFsMsg] = useState(null)
   // --- Explorar particiones de un disco ---
   const [browsePath, setBrowsePath] = useState('')
   const [partitions, setPartitions] = useState(null)
@@ -98,9 +102,41 @@ export default function DiskPanel({ onActivity }) {
     try {
       const { output } = await runCommand(line)
       setMountMsg({ ok: true, text: output })
+      // El backend responde "Particion montada: ID=081A Path=... Name=...".
+      // Extraemos el valor de ID= para precargar el campo de MKFS.
+      const match = output.match(/ID=(\S+)/)
+      if (match) setFsId(match[1])
       onActivity?.()
     } catch (err) {
       setMountMsg({ ok: false, text: err.message })
+    }
+  }
+
+  async function handleMount(e) {
+    e.preventDefault()
+    const line = buildLine('mount', { path: mountPath, name: mountName })
+    try {
+      const { output } = await runCommand(line)
+      setMountMsg({ ok: true, text: output })
+      // El backend responde "Particion montada: ID=081A Path=... Name=...".
+      // Extraemos el valor de ID= para precargar el campo de MKFS.
+      const match = output.match(/ID=(\S+)/)
+      if (match) setFsId(match[1])
+      onActivity?.()
+    } catch (err) {
+      setMountMsg({ ok: false, text: err.message })
+    }
+  }
+
+  async function handleMkfs(e) {
+    e.preventDefault()
+    const line = buildLine('mkfs', { id: fsId, type: fsType })
+    try {
+      const { output } = await runCommand(line)
+      setFsMsg({ ok: true, text: output })
+      onActivity?.()
+    } catch (err) {
+      setFsMsg({ ok: false, text: err.message })
     }
   }
 
@@ -227,6 +263,32 @@ export default function DiskPanel({ onActivity }) {
           <div className={`feedback ${mountMsg.ok ? 'feedback--ok' : 'feedback--error'}`}>{mountMsg.text}</div>
         )}
       </div>
+      <div className="card">
+        <h3 className="card__title">Formatear partición (MKFS)</h3>
+        <p className="disk-panel__hint">
+          Paso obligatorio antes de poder iniciar sesión: crea el superbloque, los bitmaps
+          y el usuario <span className="mono">root</span> dentro de la partición montada.
+        </p>
+        <form onSubmit={handleMkfs}>
+          <div className="form-grid">
+            <div className="field">
+              <label className="field__label">ID de partición montada</label>
+              <input className="field__input" value={fsId} onChange={(e) => setFsId(e.target.value)} placeholder="081A" />
+            </div>
+            <div className="field">
+              <label className="field__label">Tipo</label>
+              <select className="field__select" value={fsType} onChange={(e) => setFsType(e.target.value)}>
+                <option value="full">Full</option>
+                <option value="fast">Fast</option>
+              </select>
+            </div>
+          </div>
+          <button className="btn btn--primary" type="submit">Formatear</button>
+        </form>
+        {fsMsg && (
+          <div className={`feedback ${fsMsg.ok ? 'feedback--ok' : 'feedback--error'}`}>{fsMsg.text}</div>
+        )}
+      </div>
 
       <div className="card">
         <h3 className="card__title">Ver particiones de un disco</h3>
@@ -278,6 +340,11 @@ export default function DiskPanel({ onActivity }) {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
           gap: 16px;
+        }
+          .disk-panel__hint {
+          font-size: 12px;
+          color: var(--text-faint);
+          margin: -6px 0 12px 0;
         }
       `}</style>
     </div>

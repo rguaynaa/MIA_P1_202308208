@@ -151,7 +151,6 @@ func puedeEliminarseRecursivo(archivo *os.File, sb *types.SuperBloque, inodoNum 
 	return true
 }
 
-
 // EditFile reemplaza el contenido de un archivo existente con el contenido leido desde un archivo del sistema operativo anfitrion (-contenido). Requiere permiso de lectura y escritura sobre el archivo destino.
 func EditFile(mp *types.MountedPartition, path string, contenidoHost string, uid, gid int32, isRoot bool) {
 	archivo, err := os.OpenFile(mp.Path, os.O_RDWR, 0644)
@@ -295,7 +294,6 @@ func renombrarEntradaEnDir(archivo *os.File, sb types.SuperBloque, dirInodo int3
 	return false
 }
 
-
 // CopyFile copia un archivo o carpeta (con todo su contenido recursivamente)hacia otro destino. Solo copia los elementos a los que el usuario tenga permiso de lectura, si un hijo no tiene permiso, se omite (no se copia solo ese elemento, el resto continua
 func CopyFile(mp *types.MountedPartition, srcPath, dstPath string, uid, gid int32, isRoot bool) {
 	archivo, err := os.OpenFile(mp.Path, os.O_RDWR, 0644)
@@ -354,7 +352,7 @@ func CopyFile(mp *types.MountedPartition, srcPath, dstPath string, uid, gid int3
 	fmt.Println("Copiado:", srcPath, "->", dstPath)
 }
 
-// copiarInodoRecursivo crea una copia completa (nuevo inodo + nuevos bloques) 
+// copiarInodoRecursivo crea una copia completa (nuevo inodo + nuevos bloques)
 func copiarInodoRecursivo(archivo *os.File, sb *types.SuperBloque, partStart int64, srcInodoNum int32, padreInodo int32, uid, gid int32, isRoot bool) int32 {
 	inodoSize := int64(unsafe.Sizeof(types.Inodo{}))
 	srcInodo := utils.ObtenerInodo(archivo, sb.SInodeStart+int64(srcInodoNum)*inodoSize)
@@ -538,4 +536,3 @@ func actualizarPuntoPadre(archivo *os.File, sb types.SuperBloque, dirInodoNum in
 		}
 	}
 }
-

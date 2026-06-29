@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	NumDirectos    = 12
-	IdxIndSimple   = 12
-	IdxIndDoble    = 13
-	IdxIndTriple   = 14
-	PuntPorBloque  = 16
+	NumDirectos   = 12
+	IdxIndSimple  = 12
+	IdxIndDoble   = 13
+	IdxIndTriple  = 14
+	PuntPorBloque = 16
 )
 
 // ---------- users.txt ----------
@@ -70,8 +70,63 @@ func getPartStart(archivo *os.File, mp *types.MountedPartition) int64 {
 			return mbr.MbrPartitions[i].PartStart
 		}
 	}
+	// Buscar tambien en particiones logicas dentro de extendidas
+	for i := 0; i < 4; i++ {
+		if mbr.MbrPartitions[i].PartType != 'E' {
+			continue
+		}
+		offset := mbr.MbrPartitions[i].PartStart
+		for offset != -1 {
+			ebr := utils.ObtenerEBR(archivo, offset)
+			if ebr.PartS == -1 {
+				break
+			}
+			n := utils.BytesToString(ebr.PartName[:])
+			if n == mp.Name {
+				return ebr.PartStart
+			}
+			offset = ebr.PartNext
+		}
+	}
 	return -1
 }
+
+// getPartFit devuelve el caracter de ajuste ('B', 'F' o 'W') configurado para
+// la particion montada, buscando tanto en particiones primarias como en
+// logicas (via EBR). Por defecto devuelve 'F' (First Fit) si no se encuentra.
+func getPartFit(archivo *os.File, mp *types.MountedPartition) byte {
+	mbr := utils.ObtenerMBR(archivo)
+	for i := 0; i < 4; i++ {
+		n := utils.BytesToString(mbr.MbrPartitions[i].PartName[:])
+		if n == mp.Name {
+			return mbr.MbrPartitions[i].PartFit
+		}
+	}
+	for i := 0; i < 4; i++ {
+		if mbr.MbrPartitions[i].PartType != 'E' {
+			continue
+		}
+		offset := mbr.MbrPartitions[i].PartStart
+		for offset != -1 {
+			ebr := utils.ObtenerEBR(archivo, offset)
+			if ebr.PartS == -1 {
+				break
+			}
+			n := utils.BytesToString(ebr.PartName[:])
+			if n == mp.Name {
+				return ebr.PartFit
+			}
+			offset = ebr.PartNext
+		}
+	}
+	return 'F'
+}
+
+// currentFit almacena el ajuste de la particion sobre la que se esta
+// operando actualmente, para que allocBlock pueda usarlo al buscar bloques
+// libres y contiguos, segun lo exige el enunciado. Se actualiza al inicio
+// de cada operacion publica (MkDir, MkFile, etc.) antes de tocar el bitmap.
+var currentFit byte = 'F'
 
 func splitPath(path string) []string {
 	parts := strings.Split(path, "/")
@@ -84,18 +139,67 @@ func splitPath(path string) []string {
 	return result
 }
 
+// allocBlock busca un bloque libre en el bitmap respetando el ajuste (fit)
+// configurado en currentFit:
+//   - 'F' (First Fit): primer bloque libre encontrado.
+//   - 'B' (Best Fit): inicio de la corrida contigua de libres mas pequena
+//     que tenga al menos 1 bloque (la que mejor "ajusta").
+//   - 'W' (Worst Fit): inicio de la corrida contigua de libres mas grande.
+//
+// Para 'B' y 'W' se analizan corridas contiguas de bloques libres en el
+// bitmap y se devuelve el primer bloque de la corrida elegida, cumpliendo
+// con "buscar bloques libres y contiguos" segun el enunciado.
 func allocBlock(archivo *os.File, sb *types.SuperBloque) int32 {
-	for i := int32(0); i < sb.SBlocksCount; i++ {
-		bm := make([]byte, 1)
-		archivo.Seek(sb.SBmBlockStart+int64(i), 0)
-		archivo.Read(bm)
-		if bm[0] == '0' || bm[0] == 0 {
-			utils.EscribirByte(archivo, sb.SBmBlockStart+int64(i), '1')
-			sb.SFreeBlocksCount--
-			return i
+	if currentFit == 'F' {
+		for i := int32(0); i < sb.SBlocksCount; i++ {
+			bm := make([]byte, 1)
+			archivo.Seek(sb.SBmBlockStart+int64(i), 0)
+			archivo.Read(bm)
+			if bm[0] == '0' || bm[0] == 0 {
+				utils.EscribirByte(archivo, sb.SBmBlockStart+int64(i), '1')
+				sb.SFreeBlocksCount--
+				return i
+			}
+		}
+		return -1
+	}
+
+	// Leer bitmap completo para analizar corridas contiguas (Best/Worst Fit)
+	bitmap := make([]byte, sb.SBlocksCount)
+	archivo.Seek(sb.SBmBlockStart, 0)
+	archivo.Read(bitmap)
+
+	bestStart, bestLen := int32(-1), int32(-1)
+	i := int32(0)
+	for i < sb.SBlocksCount {
+		if bitmap[i] == '1' {
+			i++
+			continue
+		}
+		runStart := i
+		for i < sb.SBlocksCount && bitmap[i] != '1' {
+			i++
+		}
+		runLen := i - runStart
+
+		switch currentFit {
+		case 'B':
+			if bestLen == -1 || runLen < bestLen {
+				bestStart, bestLen = runStart, runLen
+			}
+		case 'W':
+			if bestLen == -1 || runLen > bestLen {
+				bestStart, bestLen = runStart, runLen
+			}
 		}
 	}
-	return -1
+
+	if bestStart == -1 {
+		return -1
+	}
+	utils.EscribirByte(archivo, sb.SBmBlockStart+int64(bestStart), '1')
+	sb.SFreeBlocksCount--
+	return bestStart
 }
 
 func freeBlock(archivo *os.File, sb *types.SuperBloque, blk int32) {
@@ -469,11 +573,19 @@ func findInDir(archivo *os.File, sb types.SuperBloque, dirInodo int32, name stri
 // es true, crea las carpetas intermedias que no existan (equivalente a -p en MKDIR
 // o -r en MKFILE). Devuelve el inodo final o -1 si fallo.
 func resolvePath(archivo *os.File, sb *types.SuperBloque, partStart int64, parts []string, crearFaltantes bool, uid, gid int32) int32 {
+	inodoSize := int64(unsafe.Sizeof(types.Inodo{}))
 	current := int32(0)
 	for _, part := range parts {
 		next := findInDir(archivo, *sb, current, part)
 		if next == -1 {
 			if !crearFaltantes {
+				return -1
+			}
+			// Validar permiso de escritura sobre el directorio padre antes
+			// de crear el subdirectorio faltante (exigido por el enunciado).
+			parentInodo := utils.ObtenerInodo(archivo, sb.SInodeStart+int64(current)*inodoSize)
+			if !utils.TienePermiso(utils.BytesToString(parentInodo.IPerm[:]), parentInodo.IUid, parentInodo.IGid, uid, gid, uid == 1, 'w') {
+				fmt.Println("Error: permiso denegado para escribir en el directorio padre")
 				return -1
 			}
 			nuevo := createDir(archivo, sb, partStart, current, part, uid, gid)
@@ -615,6 +727,7 @@ func MkDir(mp *types.MountedPartition, path string, createParents bool, uid, gid
 	if partStart == -1 {
 		return
 	}
+	currentFit = getPartFit(archivo, mp)
 	sb := utils.ObtenerSuperBloque(archivo, partStart)
 
 	parts := splitPath(path)
@@ -658,6 +771,7 @@ func MkFile(mp *types.MountedPartition, path string, size int, cont string, r bo
 	if partStart == -1 {
 		return
 	}
+	currentFit = getPartFit(archivo, mp)
 	sb := utils.ObtenerSuperBloque(archivo, partStart)
 	inodoSize := int64(unsafe.Sizeof(types.Inodo{}))
 
@@ -711,6 +825,15 @@ func MkFile(mp *types.MountedPartition, path string, size int, cont string, r bo
 		utils.EscribirInodo(archivo, inodo, inodoOffset)
 		utils.EscribirSuperBloque(archivo, sb, partStart)
 		fmt.Println("Archivo actualizado:", path)
+		return
+	}
+
+	// Validar permiso de escritura del usuario sobre la carpeta padre antes
+	// de crear el archivo nuevo (exigido por el enunciado).
+	parentOffset := sb.SInodeStart + int64(currentInodo)*inodoSize
+	parentInodo := utils.ObtenerInodo(archivo, parentOffset)
+	if !utils.TienePermiso(utils.BytesToString(parentInodo.IPerm[:]), parentInodo.IUid, parentInodo.IGid, uid, gid, uid == 1, 'w') {
+		fmt.Println("Error: permiso denegado para escribir en el directorio padre:", path)
 		return
 	}
 
@@ -877,6 +1000,7 @@ type LsEntry struct {
 	Uid   int32
 	Gid   int32
 	Mtime string
+	Ctime string
 	Size  int32
 }
 
@@ -907,6 +1031,7 @@ func lsInodo(archivo *os.File, sb types.SuperBloque, dirInodoNum int32) []LsEntr
 				Uid:   childInodo.IUid,
 				Gid:   childInodo.IGid,
 				Mtime: utils.BytesToString(childInodo.IMtime[:]),
+				Ctime: utils.BytesToString(childInodo.ICtime[:]),
 				Size:  childInodo.IS,
 			})
 		}

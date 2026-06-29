@@ -619,6 +619,16 @@ func repTree(archivo *os.File, path string, mp *types.MountedPartition) {
 	grafo += "node [shape=plaintext fontsize=9];\n"
 	grafo += "rankdir=LR;\n"
 
+	inodoOcupado := func(inodoNum int32) bool {
+		if inodoNum < 0 || inodoNum >= sb.SInodesCount {
+			return false
+		}
+		bm := make([]byte, 1)
+		archivo.Seek(sb.SBmInodeStart+int64(inodoNum), 0)
+		archivo.Read(bm)
+		return bm[0] == '1'
+	}
+
 	//hace la misma verificacion pero sobre el bitmap de bloques
 	bloqueOcupado := func(blkNum int32) bool {
 		if blkNum < 0 || blkNum >= sb.SBlocksCount {
@@ -629,7 +639,6 @@ func repTree(archivo *os.File, path string, mp *types.MountedPartition) {
 		archivo.Read(bm)
 		return bm[0] == '1'
 	}
-
 
 	var buildTree func(inodoNum int32, depth int)
 	buildTree = func(inodoNum int32, depth int) {

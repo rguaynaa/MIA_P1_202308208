@@ -32,7 +32,18 @@ export default function LoginPanel({ session, onActivity }) {
     const line = `login -user=${user} -pass=${pass} -id=${id}`
     try {
       const { output } = await runCommand(line)
-      setMsg({ ok: !output.toLowerCase().includes('error'), text: output })
+      const isError = output.toLowerCase().includes('error')
+      if (isError && output.toLowerCase().includes('users.txt')) {
+        // El backend devuelve "Error: no se pudo leer users.txt" cuando la
+        // particion esta montada pero nunca se formateo (falta MKFS), que
+        // es el unico archivo que crea el usuario root inicial.
+        setMsg({
+          ok: false,
+          text: 'Esta partición no ha sido formateada todavía. Ve a "Discos y particiones" y ejecuta MKFS sobre este ID antes de iniciar sesión.',
+        })
+      } else {
+        setMsg({ ok: !isError, text: output })
+      }
       onActivity?.()
     } catch (err) {
       setMsg({ ok: false, text: err.message })

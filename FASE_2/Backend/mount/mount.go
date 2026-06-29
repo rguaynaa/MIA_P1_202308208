@@ -89,11 +89,62 @@ func ListMounts() {
 	fmt.Println("Particiones montadas:")
 	for _, mp := range MountedPartitions {
 		fmt.Printf("ID: %-6s | Disco: %-30s | Particion: %s-16 | Correlativo: %d \n",
-		 mp.Id, mp.Path, mp.Name, mp.Correlative)
+			mp.Id, mp.Path, mp.Name, mp.Correlative)
 	}
 
-//devuelve la lista de particiones montadas
+}
+
+func Unmount(params map[string]string) {
+	id, ok := params["id"]
+	if !ok {
+		fmt.Println("Error: UNMOUNT requiere -id")
+		return
+	}
+	id = strings.ReplaceAll(id, "\"", "")
+
+	mp, found := GetMountedPartition(id)
+	if !found {
+		fmt.Println("Error: particion no montada:", id)
+		return
+	}
+
+	archivo, err := os.OpenFile(mp.Path, os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println("Error al abrir disco:", err)
+		return
+	}
+	defer archivo.Close()
+
+	mbr := utils.ObtenerMBR(archivo)
+	for i := 0; i < 4; i++ {
+		n := utils.BytesToString(mbr.MbrPartitions[i].PartName[:])
+		if n == mp.Name {
+			mbr.MbrPartitions[i].PartStatus = '0'
+			mbr.MbrPartitions[i].PartCorrelative = 0
+			for k := range mbr.MbrPartitions[i].PartId {
+				mbr.MbrPartitions[i].PartId[k] = 0
+			}
+			utils.EscribirMBR(archivo, mbr)
+			break
+		}
+	}
+
+	var nuevaLista []types.MountedPartition
+	for _, m := range MountedPartitions {
+		if m.Id != id {
+			nuevaLista = append(nuevaLista, m)
+		}
+	}
+	MountedPartitions = nuevaLista
+
+	if CurrentSession != nil && CurrentSession.Id == id {
+		CurrentSession = nil
+	}
+
+	fmt.Println("Particion desmontada:", id)
+}
+
+// devuelve la lista de particiones montadas
 func ListMountsStruct() []types.MountedPartition {
 	return MountedPartitions
-
 }
